@@ -1,0 +1,176 @@
+🧠 PROMPT FOR REPLIT AI
+
+Goal:
+Build a Telegram “relay chat bot” for customer communication — users send messages to the bot, the bot forwards them to the admin, and when the admin replies (by replying in Telegram), the bot sends the answer back to that user.
+All messages, buttons, and system text must be in English.
+
+Files to create automatically:
+requirements.txt
+aiogram==2.25.1
+python-dotenv==1.0.1
+Flask==3.0.0
+
+.replit
+run = "python main.py"
+
+replit.nix
+{ pkgs }: {
+  deps = [
+    pkgs.python311
+    pkgs.python311Packages.pip
+  ];
+}
+
+.env.example
+BOT_TOKEN=123456:ABC...
+ADMIN_ID=1041406138
+PING_HOST=https://REPL_URL/
+
+keep_alive.py
+import os, threading, time
+from flask import Flask, jsonify
+
+app = Flask(__name__)
+
+@app.get("/")
+def root():
+    return jsonify(ok=True, timestamp=time.time())
+
+def keep_alive():
+    def run():
+        port = int(os.environ.get("PORT", 8080))
+        app.run(host="0.0.0.0", port=port)
+    t = threading.Thread(target=run, daemon=True)
+    t.start()
+
+main.py
+import os, time, csv
+from dotenv import load_dotenv
+from aiogram import Bot, Dispatcher, types
+from aiogram.utils import executor
+from keep_alive import keep_alive
+
+load_dotenv()
+BOT_TOKEN = os.getenv("BOT_TOKEN")
+ADMIN_ID  = int(os.getenv("ADMIN_ID", "0"))
+
+bot = Bot(token=BOT_TOKEN, parse_mode="HTML")
+dp  = Dispatcher(bot)
+
+last_ts = {}
+reply_map = {}
+LOG = "dialog_log.csv"
+
+if not os.path.exists(LOG):
+    with open(LOG, "w", newline="", encoding="utf-8") as f:
+        csv.writer(f).writerow(["epoch","direction","user_id","name","type","text"])
+
+def log(direction, user_id, name, msg_type, text=""):
+    with open(LOG, "a", newline="", encoding="utf-8") as f:
+        csv.writer(f).writerow([int(time.time()), direction, user_id, name or "", msg_type, text])
+
+@dp.message_handler(commands=["start","help"])
+async def start_cmd(m: types.Message):
+    await m.reply(
+        "👋 <b>Welcome to FastReel AI Support!</b>\n\n"
+        "Send your question or request here — I’ll reply as soon as possible.\n\n"
+        "Use /order to view our main links."
+    )
+
+@dp.message_handler(commands=["order"])
+async def order_cmd(m: types.Message):
+    await m.reply(
+        "🧠 <b>Order Links</b>\n\n"
+        "🌐 Website: https://your-framer-site\n"
+        "💳 Payment: https://your-pay-link\n"
+        "📝 Form: https://your-google-form"
+    )
+
+@dp.message_handler(content_types=types.ContentTypes.ANY)
+async def user_message(m: types.Message):
+    if m.from_user.id == ADMIN_ID:
+        return
+
+    now = time.time()
+    if now - last_ts.get(m.from_user.id, 0) < 1:
+        return
+    last_ts[m.from_user.id] = now
+
+    name = m.from_user.full_name
+    uid  = m.from_user.id
+
+    if m.content_type == "text":
+        msg = f"📩 <b>{name}</b> (<code>{uid}</code>):\n\n{m.text}"
+        sent = await bot.send_message(ADMIN_ID, msg)
+        reply_map[sent.message_id] = uid
+        log("in", uid, name, "text", m.text)
+    else:
+        info = f"📩 <b>{name}</b> (<code>{uid}</code>) sent {m.content_type}"
+        sent = await bot.send_message(ADMIN_ID, info)
+        reply_map[sent.message_id] = uid
+        await m.copy_to(ADMIN_ID)
+        log("in", uid, name, m.content_type)
+
+    await m.reply("✅ Your message has been received! I’ll get back to you soon.")
+
+@dp.message_handler(lambda msg: msg.from_user.id == ADMIN_ID and msg.reply_to_message, content_types=types.ContentTypes.ANY)
+async def admin_reply(m: types.Message):
+    ref = reply_map.get(m.reply_to_message.message_id)
+    if not ref:
+        await m.reply("⚠️ No linked user found. Please reply to a forwarded message card.")
+        return
+
+    if m.content_type == "text":
+        await bot.send_message(ref, m.text)
+        log("out", ref, "admin", "text", m.text)
+    else:
+        await m.copy_to(ref)
+        log("out", ref, "admin", m.content_type)
+
+    await m.reply("✅ Message sent to user.")
+
+if __name__ == "__main__":
+    keep_alive()
+    executor.start_polling(dp, skip_updates=True)
+
+README.md
+# FastReel AI - Telegram Relay Bot (English Version)
+
+## What it does
+- Users message the bot → bot forwards to ADMIN.
+- Admin replies (via reply) → bot sends back to user.
+- Works with text, photos, files, and voice.
+- All logs stored in `dialog_log.csv`.
+
+## Setup
+1. Add Replit **Secrets**:
+   - `BOT_TOKEN` → your Telegram bot token (from @BotFather)
+   - `ADMIN_ID` → your Telegram ID (via @userinfobot)
+   - `PING_HOST` → your Replit URL (optional, for uptime pings)
+2. Click **Run**.
+3. Open your bot and send a message — test the full flow.
+
+## Commands
+- `/start` → intro & greeting  
+- `/order` → returns your website, payment, and Google Form links
+
+## Keep alive
+Use UptimeRobot or cron-job.org to ping your Replit URL every 5 minutes.
+
+
+✅ After Replit finishes creating the app:
+
+Go to Tools → Secrets.
+Add:
+
+BOT_TOKEN
+
+ADMIN_ID (your Telegram ID)
+
+optional PING_HOST.
+
+Press Run → check the console for “Running on port 8080”.
+
+Open your bot in Telegram → tap “Start” → send a test message.
+
+You’ll receive it on your admin Telegram; reply — the user gets your answer instantly.
