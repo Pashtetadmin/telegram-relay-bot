@@ -37,7 +37,8 @@ user_sessions = {}
 @dp.message_handler(commands=["start", "help"])
 async def start_command(message: types.Message):
     """Welcome message for users"""
-    await message.reply(
+    await bot.send_message(
+        message.chat.id,
         "👋 <b>Welcome to FastReel AI Support!</b>\n\n"
         "Send your question or request here — I'll reply as soon as possible.\n\n"
         "Use /order to view our main links."
@@ -47,7 +48,8 @@ async def start_command(message: types.Message):
 @dp.message_handler(commands=["order"])
 async def order_command(message: types.Message):
     """Display order links"""
-    await message.reply(
+    await bot.send_message(
+        message.chat.id,
         "🧠 <b>Order Links</b>\n\n"
         "🌐 Website: https://fastreelai.framer.website/\n"
         "💳 Payment: https://misapasta.gumroad.com/l/dfokn\n"
@@ -61,7 +63,8 @@ async def admin_reply_command(message: types.Message):
     try:
         parts = message.text.split(maxsplit=2)
         if len(parts) < 3:
-            await message.reply(
+            await bot.send_message(
+                message.chat.id,
                 "❌ Usage: /r <user_id> <message>\n"
                 "Example: /r 123456789 Hello, how can I help you?"
             )
@@ -71,14 +74,14 @@ async def admin_reply_command(message: types.Message):
         reply_text = parts[2]
         
         await bot.send_message(user_id, reply_text)
-        await message.reply(f"✅ Message sent to user {user_id}")
+        await bot.send_message(message.chat.id, f"✅ Message sent to user {user_id}")
         logger.info(f"Admin sent message to user {user_id}")
         
     except ValueError:
-        await message.reply("❌ Invalid user ID. Must be a number.")
+        await bot.send_message(message.chat.id, "❌ Invalid user ID. Must be a number.")
     except Exception as e:
         logger.error(f"Error sending message to user: {e}")
-        await message.reply(f"❌ Error: {e}")
+        await bot.send_message(message.chat.id, f"❌ Error: {e}")
 
 
 @dp.message_handler(content_types=types.ContentTypes.ANY)
@@ -116,11 +119,11 @@ async def forward_to_admin(message: types.Message):
             )
             await message.copy_to(ADMIN_ID, caption=caption)
         
-        await message.reply("✅ Your message has been received! I'll get back to you soon.")
+        await bot.send_message(message.chat.id, "✅ Your message has been received! I'll get back to you soon.")
         logger.info(f"Forwarded message from user {user_id} ({user_name}) to admin")
     except Exception as e:
         logger.error(f"Error forwarding message to admin: {e}")
-        await message.reply("⚠️ An error occurred. Please try again later.")
+        await bot.send_message(message.chat.id, "⚠️ An error occurred. Please try again later.")
 
 
 async def on_startup(app):
