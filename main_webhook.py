@@ -29,6 +29,8 @@ bot = Bot(token=BOT_TOKEN, parse_mode="HTML")
 dp = Dispatcher(bot)
 dp.middleware.setup(LoggingMiddleware())
 
+Bot.set_current(bot)
+
 user_sessions = {}
 
 
